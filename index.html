@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>いいね！投票</title>
+<style>
+  :root {
+    --bg: #f6f4f0;
+    --card: #ffffff;
+    --ink: #1c1b1a;
+    --sub: #6b6862;
+    --line: #e4e0d8;
+    --heart: #e0364d;
+    --heart-soft: #fde8eb;
+    --accent: #1f5f8b;
+    --gold: #c88a12;
+    --radius: 14px;
+    --font: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  input { font: inherit; }
+  .muted { color: var(--sub); }
+</style>
+
+<style>
+  .hdr {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(246, 244, 240, .94);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .hdr .ttl { flex: 1; min-width: 0; font-weight: 700; font-size: 15px; line-height: 1.3; }
+  .hdr .ttl small { display: block; font-weight: 400; font-size: 12px; color: var(--sub); }
+  .wallet { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+  .wallet .lbl { font-size: 11px; color: var(--sub); }
+  .pips { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; max-width: 150px; }
+  .pip { width: 20px; height: 20px; }
+  .pip path { fill: var(--heart); transition: fill .2s; }
+  .pip.used path { fill: #d9d4cb; }
+  .pips .num { font-weight: 700; color: var(--heart); font-size: 18px; }
+
+  main { max-width: 760px; margin: 0 auto; padding: 12px 16px 48px; }
+
+  .banner {
+    border-radius: var(--radius); padding: 10px 14px; margin-bottom: 12px;
+    font-size: 13px; background: #fff7e0; border: 1px solid #f0dca0; color: #6a4a00;
+  }
+  .banner.closed { background: #eef0f3; border-color: #d5d9df; color: #3d4652; }
+
+  .focus {
+    background: var(--card); border-radius: 18px; padding: 18px 18px 16px;
+    border: 2px solid var(--heart); margin-bottom: 18px;
+    box-shadow: 0 6px 24px rgba(224, 54, 77, .12);
+  }
+  .focus .lab { font-size: 12px; color: var(--heart); font-weight: 700; letter-spacing: .04em; }
+  .focus .fid { font-size: 13px; color: var(--sub); margin-top: 6px; }
+  .focus h2 { font-size: 18px; line-height: 1.45; margin: 4px 0 6px; }
+  .focus .meta { font-size: 13px; color: var(--sub); margin-bottom: 14px; }
+  .bigbtn {
+    width: 100%; border: 0; border-radius: 999px; padding: 14px 18px;
+    background: var(--heart); color: #fff; font-size: 18px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: transform .1s, background .2s;
+  }
+  .bigbtn:active { transform: scale(.98); }
+  .bigbtn svg { width: 22px; height: 22px; flex-shrink: 0; }
+  .bigbtn svg path { fill: currentColor; }
+  .bigbtn.done { background: var(--heart-soft); color: var(--heart); }
+  .bigbtn[disabled] { opacity: .5; }
+  .focus .hint { text-align: center; font-size: 12px; color: var(--sub); margin-top: 8px; }
+
+  .toolbar { display: flex; gap: 8px; margin: 4px 0 10px; align-items: center; }
+  .search {
+    flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--card);
+    border-radius: 999px; padding: 9px 14px; font-size: 15px; outline: none;
+  }
+  .search:focus { border-color: var(--accent); }
+  .seg { display: flex; background: #e9e5dd; border-radius: 999px; padding: 3px; flex-shrink: 0; }
+  .seg button { border: 0; background: transparent; padding: 6px 11px; border-radius: 999px; font-size: 13px; color: var(--sub); }
+  .seg button.on { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+  .count-line { font-size: 12px; color: var(--sub); margin: 0 4px 8px; display: flex; justify-content: space-between; gap: 8px; }
+
+  .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .card {
+    background: var(--card); border-radius: var(--radius); border: 1px solid var(--line);
+    padding: 12px 12px 12px 14px; display: flex; gap: 12px; align-items: center;
+  }
+  .card.voted { border-color: #f3b4be; background: #fffafa; }
+  .card.flash { animation: flash 1.6s ease-out; }
+  @keyframes flash { 0% { box-shadow: 0 0 0 4px rgba(224,54,77,.35); } 100% { box-shadow: 0 0 0 0 rgba(224,54,77,0); } }
+  .cid { font-size: 12px; font-weight: 700; color: var(--accent); background: #e8f0f6; border-radius: 6px; padding: 2px 6px; align-self: flex-start; flex-shrink: 0; margin-top: 1px; font-variant-numeric: tabular-nums; }
+  .cbody { flex: 1; min-width: 0; }
+  .ctitle { font-size: 14px; line-height: 1.45; font-weight: 600; overflow-wrap: anywhere; }
+  .cmeta { font-size: 12px; color: var(--sub); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 2px 10px; }
+  .rank { font-weight: 700; color: var(--gold); }
+  .like {
+    flex-shrink: 0; border: 1.5px solid var(--line); background: var(--card);
+    border-radius: 12px; min-width: 56px; padding: 6px 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 0;
+    transition: transform .1s, background .2s, border-color .2s;
+  }
+  .like:active { transform: scale(.94); }
+  .like svg { width: 22px; height: 22px; }
+  .like svg path { fill: none; stroke: var(--heart); stroke-width: 2; transition: fill .2s; }
+  .like.on { background: var(--heart-soft); border-color: var(--heart); }
+  .like.on svg path { fill: var(--heart); }
+  .like .n { font-size: 12px; font-weight: 700; color: var(--heart); font-variant-numeric: tabular-nums; min-height: 1em; }
+  .like[disabled] { opacity: .45; }
+  .like.pop svg { animation: pop .35s ease-out; }
+  @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+
+  .empty { text-align: center; color: var(--sub); padding: 32px 0; font-size: 14px; }
+
+  .foot { margin-top: 28px; font-size: 12px; color: var(--sub); line-height: 1.7; }
+  .foot a { color: var(--accent); }
+  .foot .links { display: flex; gap: 14px; margin-bottom: 10px; font-size: 14px; }
+  .toppill {
+    flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;
+    background: linear-gradient(135deg, #f5b82e, #e0832a); color: #fff; text-decoration: none;
+    font-weight: 800; font-size: 13px; padding: 7px 11px; border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(224,131,42,.35); white-space: nowrap;
+  }
+  .toppill:active { transform: scale(.96); }
+  .topcard {
+    display: block; text-decoration: none; color: #3b2a00; margin: 0 0 14px;
+    background: linear-gradient(135deg, #fff4d1, #ffe3b8); border: 1.5px solid #f0c060;
+    border-radius: 16px; padding: 12px 14px; box-shadow: 0 4px 14px rgba(224,131,42,.15);
+  }
+  .topcard .th { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 800; font-size: 16px; }
+  .topcard .th .go { font-size: 13px; background: #e0832a; color: #fff; border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+  .topcard ol { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+  .topcard li { display: flex; gap: 8px; font-size: 13px; align-items: baseline; min-width: 0; }
+  .topcard li .r { font-weight: 800; width: 1.6em; flex-shrink: 0; }
+  .topcard li .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topcard li .v { font-weight: 700; color: var(--heart); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .topcard .none { font-size: 13px; margin-top: 4px; color: #6a5520; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
+    background: #1c1b1a; color: #fff; padding: 10px 16px; border-radius: 999px;
+    font-size: 14px; opacity: 0; pointer-events: none; transition: all .25s; max-width: calc(100% - 32px);
+    text-align: center; z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .loading { text-align: center; padding: 48px 0; color: var(--sub); }
+</style>
+</head>
+<body>
+<header class="hdr">
+  <div class="ttl"><span id="title"></span><small>いいね！投票</small></div>
+  <a class="toppill" id="topPill" href="#">🏆 TOP10</a>
+  <div class="wallet"><span class="lbl" id="walletLbl">残りの票</span><div class="pips" id="pips"></div></div>
+</header>
+<main>
+  <div id="banner"></div>
+  <section id="focus"></section>
+  <a class="topcard" id="topCard" href="#"></a>
+  <div class="toolbar">
+    <input id="q" class="search" type="search" placeholder="番号・タイトル・場所で検索" autocomplete="off">
+    <div class="seg" id="sortSeg">
+      <button data-sort="id" class="on">番号順</button>
+      <button data-sort="pop">人気順</button>
+    </div>
+  </div>
+  <div class="count-line"><span id="countLine"></span><span id="updated"></span></div>
+  <ul class="list" id="list"><li class="loading">読み込み中…</li></ul>
+  <div class="foot">
+    ・ポスターのQRコードは、スマホの<b>カメラアプリ</b>で読み取ってください（LINEなどのアプリで読み取ると、別の投票者として扱われ、投票状況が引き継がれません）。<br>
+    ・投票状況はこのブラウザに保存されます。履歴の削除やシークレットモードでは引き継がれません。<br>
+    ・投票は誰が投票したか分からない形で集計されます。<br>
+    ・<span id="voterTag"></span>（ページを開き直してもこの番号が同じなら、投票状況は保存されています）
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+// ================================================================
+//  設定：Apps Script のウェブアプリURL（…/exec）をここに貼り付けてください
+window.API_URL = 'https://script.google.com/macros/s/AKfycbxUVlTusaHw6nMQZsOv-ytVFlBRGT3-vT9NMzDe2G1rAACjmmEB5Mj7c-S8nL_EwdyZZw/exec';
+// ================================================================
+var BOOT = {
+  poster: (location.search.match(/[?&]p=([^&#]+)/) || [])[1] ? decodeURIComponent(location.search.match(/[?&]p=([^&#]+)/)[1]) : '',
+  key: '', baseUrl: '', title: '',
+  topUrl: window.API_URL + '?view=top'
+};
+</script>
+<script>
+(function () {
+  var HEART = 'M12 20.5s-7.3-4.5-9.6-9C.8 8.2 2.7 4.5 6.4 4.5c2.2 0 3.6 1.3 4.4 2.6l1.2 1.6 1.2-1.6c.8-1.3 2.2-2.6 4.4-2.6 3.7 0 5.6 3.7 4 7-2.3 4.5-9.6 9-9.6 9z';
+  var heartSvg = function (cls) { return '<svg class="' + (cls || '') + '" viewBox="0 0 24 24" aria-hidden="true"><path d="' + HEART + '"/></svg>'; };
+
+  /* ---------- voter id: saved in 3 places (localStorage / cookie / IndexedDB) ---------- */
+  var STORE_KEY = 'pv_voter_v1';
+  var ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
+  function readCookie() {
+    try { var m = document.cookie.match(/(?:^|; )pv_voter_v1=([A-Za-z0-9_-]+)/); return m ? m[1] : ''; } catch (e) { return ''; }
+  }
+  function writeCookie(id) {
+    try { document.cookie = STORE_KEY + '=' + id + '; max-age=31536000; path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : ''); } catch (e) {}
+  }
+  function readLS() { try { return localStorage.getItem(STORE_KEY) || ''; } catch (e) { return ''; } }
+  function writeLS(id) { try { localStorage.setItem(STORE_KEY, id); } catch (e) {} }
+  function idb(mode, value, cb) {
+    var done = false, finish = function (v) { if (!done) { done = true; cb(v || ''); } };
+    setTimeout(finish, 1500);
+    try {
+      var req = indexedDB.open('poster_vote', 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore('kv'); };
+      req.onerror = function () { finish(''); };
+      req.onsuccess = function () {
+        try {
+          var tx = req.result.transaction('kv', mode === 'get' ? 'readonly' : 'readwrite');
+          var st = tx.objectStore('kv');
+          if (mode === 'get') { var g = st.get(STORE_KEY); g.onsuccess = function () { finish(g.result); }; g.onerror = function () { finish(''); }; }
+          else { st.put(value, STORE_KEY); tx.oncomplete = function () { finish(value); }; tx.onerror = function () { finish(''); }; }
+        } catch (e) { finish(''); }
+      };
+    } catch (e) { finish(''); }
+  }
+  function newId() {
+    var a = new Uint8Array(16);
+    (window.crypto || window.msCrypto).getRandomValues(a);
+    var s = ''; for (var i = 0; i < a.length; i++) s += String.fromCharCode(a[i]);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  /** どれか1か所に残っていれば復元し、3か所すべてに書き戻す */
+  function loadVoterId(cb) {
+    var id = readLS();
+    if (!ID_RE.test(id)) id = readCookie();
+    idb('get', null, function (fromDb) {
+      if (!ID_RE.test(id)) id = ID_RE.test(fromDb) ? fromDb : newId();
+      writeLS(id); writeCookie(id);
+      if (fromDb !== id) idb('put', id, function () {});
+      cb(id);
+    });
+  }
+  var voterId = '';
+
+  /* ---------- state ---------- */
+  var S = { posters: [], counts: null, stats: null, myVotes: [], settings: {}, sort: 'id', q: '', busy: {} };
+  var focusId = BOOT.poster || '';
+  var $ = function (id) { return document.getElementById(id); };
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function cmpId(a, b) { return a.localeCompare(b, 'ja', { numeric: true }); }
+  function remaining() { return Math.max(0, (S.settings.VOTES_PER_PERSON || 0) - S.myVotes.length); }
+  function votedCount(id) { var n = 0; S.myVotes.forEach(function (v) { if (v === id) n++; }); return n; }
+
+  function ranks() {
+    var r = {};
+    if (!S.counts) return r;
+    var arr = Object.keys(S.counts).filter(function (k) { return S.counts[k] > 0; })
+      .sort(function (a, b) { return S.counts[b] - S.counts[a]; });
+    var prev = null, rank = 0;
+    arr.forEach(function (id, i) { var n = S.counts[id]; if (n !== prev) { rank = i + 1; prev = n; } r[id] = rank; });
+    return r;
+  }
+
+  /* ---------- rendering ---------- */
+  function renderHeader() {
+    $('title').textContent = S.settings.EVENT_TITLE || BOOT.title || '';
+    var total = S.settings.VOTES_PER_PERSON || 0, rem = remaining();
+    var html = '';
+    if (total <= 10) {
+      for (var i = 0; i < total; i++) html += '<svg class="pip' + (i < rem ? '' : ' used') + '" viewBox="0 0 24 24"><path d="' + HEART + '"/></svg>';
+    } else {
+      html = '<span class="num">' + rem + '</span><span class="muted" style="font-size:12px;align-self:flex-end">/' + total + '</span>';
+    }
+    $('pips').innerHTML = html;
+    $('walletLbl').textContent = '残り ' + rem + ' 票';
+  }
+
+  function renderBanner() {
+    var b = '';
+    if (!S.settings.VOTING_OPEN) b = '<div class="banner closed">現在、投票は受け付けていません。</div>';
+    else if (S.myVotes.length === 0) b = '<div class="banner">気に入ったポスターに「いいね！」してください。1人 <b>' + S.settings.VOTES_PER_PERSON + ' 票</b>まで投票できます。</div>';
+    else if (remaining() === 0) b = '<div class="banner">' + S.settings.VOTES_PER_PERSON + ' 票すべて投票しました。ありがとうございます！ 投票を取り消すと、別の発表に投票し直せます。</div>';
+    $('banner').innerHTML = b;
+  }
+
+  function likeState(id) {
+    var mine = votedCount(id);
+    var canVote = S.settings.VOTING_OPEN && remaining() > 0 && (S.settings.ALLOW_SAME_POSTER || mine === 0);
+    var canCancel = S.settings.VOTING_OPEN && mine > 0;
+    return { mine: mine, canVote: canVote, canCancel: canCancel };
+  }
+
+  function renderFocus() {
+    var el = $('focus');
+    var p = focusId && S.posters.filter(function (x) { return x.id === focusId; })[0];
+    if (!p) { el.innerHTML = ''; return; }
+    var st = likeState(p.id), busy = !!S.busy[p.id];
+    var label, cls = 'bigbtn', disabled = false, action = 'vote';
+    if (!S.settings.VOTING_OPEN) { label = '投票受付は終了しています'; disabled = true; }
+    else if (st.mine > 0 && !S.settings.ALLOW_SAME_POSTER) { label = heartSvg() + ' いいね！済み'; cls += ' done'; action = 'none'; }
+    else if (remaining() === 0) { label = '票を使い切りました'; disabled = true; }
+    else { label = '♥ いいね！する'; }
+    var hint = '';
+    if (st.mine > 0 && S.settings.VOTING_OPEN) hint = '<div class="hint">この発表に ' + st.mine + ' 票投票済み ・ <a href="#" data-cancel="' + esc(p.id) + '">取り消す</a></div>';
+    else if (S.settings.VOTING_OPEN && remaining() > 0) hint = '<div class="hint">残り ' + remaining() + ' 票</div>';
+    var n = S.counts ? (S.counts[p.id] || 0) : null;
+    el.innerHTML =
+      '<div class="focus">' +
+        '<div class="lab">このポスター</div>' +
+        '<div class="fid">' + esc(p.id) + (n != null ? ' ・ ♥ ' + n : '') + '</div>' +
+        '<h2>' + esc(p.title) + '</h2>' +
+        '<div class="meta">' + [p.presenter, p.place ? '📍 ' + p.place : '', p.area].filter(Boolean).map(esc).join(' ・ ') + '</div>' +
+        '<button class="' + cls + '" data-act="' + action + '" data-id="' + esc(p.id) + '"' + (disabled || busy ? ' disabled' : '') + '>' + label + '</button>' +
+        hint +
+      '</div>';
+  }
+
+  function renderList() {
+    var rk = ranks();
+    var q = S.q.trim().toLowerCase();
+    var items = S.posters.filter(function (p) {
+      if (!q) return true;
+      return (p.id + ' ' + p.title + ' ' + p.place + ' ' + p.area + ' ' + p.presenter).toLowerCase().indexOf(q) >= 0;
+    });
+    if (S.sort === 'pop' && S.counts) {
+      items.sort(function (a, b) { return (S.counts[b.id] || 0) - (S.counts[a.id] || 0) || cmpId(a.id, b.id); });
+    }
+    $('countLine').textContent = items.length + ' 件' + (S.stats ? ' ・ 総投票 ' + S.stats.votes + ' 票' : '');
+    if (!items.length) { $('list').innerHTML = '<li class="empty">該当する発表はありません</li>'; return; }
+    $('list').innerHTML = items.map(function (p) {
+      var st = likeState(p.id);
+      var n = S.counts ? (S.counts[p.id] || 0) : null;
+      var r = rk[p.id];
+      var meta = [];
+      if (r && r <= 10) meta.push('<span class="rank">🔥 ' + r + '位</span>');
+      if (p.place) meta.push('<span>📍 ' + esc(p.place) + '</span>');
+      if (p.presenter) meta.push('<span>' + esc(p.presenter) + '</span>');
+      var on = st.mine > 0;
+      var disabled = S.busy[p.id] || (!st.canVote && !(on && st.canCancel && !S.settings.ALLOW_SAME_POSTER));
+      var act = (on && !S.settings.ALLOW_SAME_POSTER) ? 'cancel' : 'vote';
+      var aria = act === 'cancel' ? 'いいね！を取り消す' : 'いいね！する';
+      return '<li class="card' + (on ? ' voted' : '') + '" id="card-' + esc(p.id) + '">' +
+        '<span class="cid">' + esc(p.id) + '</span>' +
+        '<div class="cbody"><div class="ctitle">' + esc(p.title) + '</div><div class="cmeta">' + meta.join('') + '</div></div>' +
+        '<button class="like' + (on ? ' on' : '') + '" data-act="' + act + '" data-id="' + esc(p.id) + '" aria-label="' + aria + '"' + (disabled ? ' disabled' : '') + '>' +
+          heartSvg() + '<span class="n">' + (n != null ? n : (on ? (st.mine > 1 ? '×' + st.mine : '済') : '')) + '</span>' +
+        '</button></li>';
+    }).join('');
+  }
+
+  function renderTopCard() {
+    var c = S.counts || {};
+    var top = S.posters.filter(function (p) { return c[p.id] > 0; })
+      .sort(function (a, b) { return c[b.id] - c[a.id] || cmpId(a.id, b.id); }).slice(0, 3);
+    var rk = ranks(), medal = ['🥇', '🥈', '🥉'];
+    var body = top.length
+      ? '<ol>' + top.map(function (p) { var r = rk[p.id]; return '<li><span class="r">' + (medal[r - 1] || r + '位') + '</span><span class="t">' + esc(p.id) + ' ' + esc(p.title) + '</span><span class="v">♥ ' + c[p.id] + '</span></li>'; }).join('') + '</ol>'
+      : '<div class="none">まだ投票はありません。最初の「いいね！」をどうぞ！</div>';
+    $('topCard').innerHTML = '<div class="th"><span>🏆 いいね！ランキング</span><span class="go">TOP10を見る ›</span></div>' + body;
+  }
+
+  function renderAll() {
+    renderHeader(); renderBanner(); renderFocus(); renderList();
+    $('sortSeg').style.display = S.counts ? '' : 'none';
+    var showTop = !!S.settings.SHOW_RANKING;
+    $('topPill').style.display = showTop ? '' : 'none';
+    $('topCard').style.display = showTop ? '' : 'none';
+    if (showTop) renderTopCard();
+  }
+
+  /* ---------- server ---------- */
+  function apply(res) {
+    if (!res) return;
+    if (res.posters) S.posters = res.posters;
+    if (res.settings) S.settings = res.settings;
+    if ('counts' in res) S.counts = res.counts;
+    if ('stats' in res) S.stats = res.stats;
+    if (res.myVotes) S.myVotes = res.myVotes;
+    var d = new Date(res.now || Date.now());
+    $('updated').textContent = (S.counts ? '' : '') + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ' 更新';
+  }
+
+  function call(fn, args, ok, ng) {
+    ng = ng || function () { toast('通信エラーが発生しました。電波の良い場所で再度お試しください。'); renderAll(); };
+    if (window.API_URL) {
+      // 独立サイト版：Apps Script を JSON API として呼ぶ（text/plain の POST はプリフライト不要）
+      fetch(window.API_URL, { method: 'POST', body: JSON.stringify({ fn: fn, args: args }), redirect: 'follow' })
+        .then(function (r) { return r.json(); })
+        .then(function (res) { if (res && res.error) throw new Error(res.error); ok(res); })
+        .catch(ng);
+      return;
+    }
+    var r = google.script.run.withSuccessHandler(ok).withFailureHandler(ng || function (e) { toast('通信エラーが発生しました。電波の良い場所で再度お試しください。'); renderAll(); });
+    r[fn].apply(r, args);
+  }
+
+  var toastTimer;
+  function toast(msg) {
+    var t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
+  }
+
+  function act(kind, id) {
+    if (S.busy[id]) return;
+    S.busy[id] = true; renderAll();
+    call(kind === 'cancel' ? 'apiCancel' : 'apiVote', [voterId, id], function (res) {
+      S.busy[id] = false;
+      apply(res);
+      renderAll();
+      if (!res.ok) { toast(res.message || '投票できませんでした'); return; }
+      if (kind === 'vote') {
+        toast('♥ いいね！しました（残り ' + remaining() + ' 票）');
+        var b = document.querySelector('.like[data-id="' + cssEsc(id) + '"]'); if (b) b.classList.add('pop');
+      } else {
+        toast('取り消しました（残り ' + remaining() + ' 票）');
+      }
+    }, function () { S.busy[id] = false; toast('通信エラーが発生しました。もう一度お試しください。'); renderAll(); });
+  }
+
+  function cssEsc(s) { return String(s).replace(/["\\]/g, '\\$&'); }
+
+  document.addEventListener('click', function (e) {
+    var c = e.target.closest('[data-cancel]');
+    if (c) { e.preventDefault(); act('cancel', c.getAttribute('data-cancel')); return; }
+    var b = e.target.closest('button[data-act]');
+    if (b && !b.disabled) {
+      var a = b.getAttribute('data-act');
+      if (a === 'vote' || a === 'cancel') act(a, b.getAttribute('data-id'));
+      return;
+    }
+    var s = e.target.closest('#sortSeg button');
+    if (s) {
+      S.sort = s.getAttribute('data-sort');
+      Array.prototype.forEach.call($('sortSeg').children, function (x) { x.classList.toggle('on', x === s); });
+      renderList();
+    }
+  });
+  $('q').addEventListener('input', function () { S.q = this.value; renderList(); });
+  var topUrl = BOOT.topUrl || (BOOT.baseUrl ? BOOT.baseUrl + '?view=top' : '');
+  if (topUrl) { $('topPill').href = topUrl; $('topCard').href = topUrl; }
+
+  function refresh() {
+    if (document.hidden) return;
+    call('apiState', [voterId], function (res) { apply(res); renderAll(); }, function () {});
+  }
+
+  loadVoterId(function (id) {
+  voterId = id;
+  $('voterTag').textContent = '投票者番号 …' + id.slice(-4);
+  call('apiInit', [voterId], function (res) {
+    apply(res);
+    renderAll();
+    if (focusId) {
+      var card = $('card-' + focusId);
+      if (card) card.classList.add('flash');
+    }
+    setInterval(refresh, 30000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
+  }, function () {
+    $('list').innerHTML = '<li class="empty">読み込みに失敗しました。ページを再読み込みしてください。</li>';
+  });
+  });
+})();
+</script>
+</body>
+</html>
