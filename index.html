@@ -393,7 +393,9 @@ var BOOT = {
     ng = ng || function () { toast('通信エラーが発生しました。電波の良い場所で再度お試しください。'); renderAll(); };
     if (window.API_URL) {
       // 独立サイト版：Apps Script を JSON API として呼ぶ（text/plain の POST はプリフライト不要）
-      fetch(window.API_URL, { method: 'POST', body: JSON.stringify({ fn: fn, args: args }), redirect: 'follow' })
+      // iPhone(Safari)が古い応答を使い回さないよう、毎回異なるURLにし、キャッシュも使わない
+      fetch(window.API_URL + (window.API_URL.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now() + Math.random().toString(36).slice(2, 6),
+        { method: 'POST', body: JSON.stringify({ fn: fn, args: args }), redirect: 'follow', cache: 'no-store' })
         .then(function (r) { return r.json(); })
         .then(function (res) { if (res && res.error) throw new Error(res.error); ok(res); })
         .catch(ng);
